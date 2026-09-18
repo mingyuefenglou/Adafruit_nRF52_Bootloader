@@ -90,6 +90,10 @@ void board_init(void) {
   #if LEDS_NUMBER > 1
   led_pwm_init(LED_SECONDARY, LED_SECONDARY_PIN);
   #endif
+  #if LEDS_NUMBER > 2 && defined(LED_THIRDARY_PIN)
+  // Tertiary LED (nini v2_rx blue P0.29): drive the previously-undriven 3rd LED.
+  led_pwm_init(LED_THIRDARY, LED_THIRDARY_PIN);
+  #endif
 #endif
 
 #if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102_CLK)
@@ -375,6 +379,9 @@ static uint32_t primary_cycle_length;
 #ifdef LED_SECONDARY_PIN
 static uint32_t secondary_cycle_length;
 #endif
+#if LEDS_NUMBER > 2 && defined(LED_THIRDARY_PIN)
+static uint32_t thirdary_cycle_length = 2000; // slow independent breathing beacon
+#endif
 
 void led_tick(void) {
   uint32_t millis = _systick_count;
@@ -401,6 +408,23 @@ void led_tick(void) {
   duty_cycle = 0xff - duty_cycle;
   #endif
   led_pwm_duty_cycle(LED_SECONDARY, duty_cycle);
+  #endif
+
+  #if LEDS_NUMBER > 2 && defined(LED_THIRDARY_PIN)
+  /* Tertiary LED: independent slow breathing beacon (DFU/bootloader active).
+   * Breathes continuously — polarity-safe under both active-high and active-
+   * low LED wiring (the oscillation is visible either way; exact brightness/
+   * polarity to be confirmed on-board, see R8). */
+  cycle = millis % thirdary_cycle_length;
+  half_cycle = thirdary_cycle_length / 2;
+  if (cycle > half_cycle) {
+      cycle = thirdary_cycle_length - cycle;
+  }
+  duty_cycle = 0x6f * cycle / half_cycle;
+  #if LED_STATE_ON == 1
+  duty_cycle = 0xff - duty_cycle;
+  #endif
+  led_pwm_duty_cycle(LED_THIRDARY, duty_cycle);
   #endif
 }
 

@@ -42,6 +42,11 @@
 #define LED_PRIMARY 0
 // The secondary LED, when available, is usually blue.
 #define LED_SECONDARY 1
+// The tertiary LED, when available (e.g. nini v2_rx has 3 LEDs), index 2 into
+// the shared PWM0 channel table. Guarded so 2-LED boards (nini v3) skip it.
+#if LEDS_NUMBER > 2
+#define LED_THIRDARY 2
+#endif
 
 // Its more common for LEDs to be sinking to the MCU pin. Setting is only for individual LEDs, not
 // RGB LEDs.
