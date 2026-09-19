@@ -375,7 +375,8 @@ void led_pwm_duty_cycle(uint32_t led_index, uint16_t duty_cycle) {
   nrf_pwm_task_trigger(NRF_PWM0, NRF_PWM_TASK_SEQSTART0);
 }
 
-static uint32_t primary_cycle_length;
+#define LED_CYCLE_BLINK 1 /* 哨兵：5Hz 硬快闪（led_tick 特判） */
+static uint32_t primary_cycle_length = 3000; /* 未收到任何状态前：3s 柔呼吸 */
 #ifdef LED_SECONDARY_PIN
 static uint32_t secondary_cycle_length;
 #endif
@@ -386,45 +387,53 @@ static uint32_t thirdary_cycle_length = 2000; // slow independent breathing beac
 void led_tick(void) {
   uint32_t millis = _systick_count;
 
-  uint32_t cycle = millis % primary_cycle_length;
-  uint32_t half_cycle = primary_cycle_length / 2;
-  if (cycle > half_cycle) {
-    cycle = primary_cycle_length - cycle;
+  /* LED 最终形态（nini 三色共阴板）：蓝=主状态灯，红/绿不参与（灭）。
+   * cycle_length 语义：>0 = 该周期三角呼吸（幅度见各灯系数）；
+   *                   ==0 = 常亮 60%（"就绪"）；未初始化(0 且从未设过)同样安全。
+   * 呼吸幅度从低到满缓慢起伏（美观），写入态 100ms 快闪（明确"在写，别拔"）。 */
+  {
+    uint16_t duty_cycle;
+    if (primary_cycle_length == 0) {
+      duty_cycle = 153; /* 60% 常亮 */
+    } else if (primary_cycle_length == LED_CYCLE_BLINK) {
+      duty_cycle = (millis / 100) % 2 ? 0xff : 128; /* 5Hz 硬快闪 */
+    } else {
+      uint32_t cycle = millis % primary_cycle_length;
+      uint32_t half_cycle = primary_cycle_length / 2;
+      if (half_cycle == 0) {
+        half_cycle = 1;
+      }
+      if (cycle > half_cycle) {
+        cycle = primary_cycle_length - cycle;
+      }
+      duty_cycle = 0x4f * cycle / half_cycle;
+    }
+    #if LED_STATE_ON == 1
+    duty_cycle = 0xff - duty_cycle;
+    #endif
+    led_pwm_duty_cycle(LED_PRIMARY, duty_cycle);
   }
-  uint16_t duty_cycle = 0x4f * cycle / half_cycle;
-  #if LED_STATE_ON == 1
-  duty_cycle = 0xff - duty_cycle;
-  #endif
-  led_pwm_duty_cycle(LED_PRIMARY, duty_cycle);
 
   #ifdef LED_SECONDARY_PIN
-  cycle = millis % secondary_cycle_length;
-  half_cycle = secondary_cycle_length / 2;
-  if (cycle > half_cycle) {
-      cycle = secondary_cycle_length - cycle;
+  /* 绿灯：nini 板不参与（常灭；BLE 语义由蓝主灯承担）。保留通道写 0 防悬空占空。 */
+  {
+    uint16_t duty_cycle = 0;
+    #if LED_STATE_ON == 1
+    duty_cycle = 0xff;
+    #endif
+    led_pwm_duty_cycle(LED_SECONDARY, duty_cycle);
   }
-  duty_cycle = 0x8f * cycle / half_cycle;
-  #if LED_STATE_ON == 1
-  duty_cycle = 0xff - duty_cycle;
-  #endif
-  led_pwm_duty_cycle(LED_SECONDARY, duty_cycle);
   #endif
 
   #if LEDS_NUMBER > 2 && defined(LED_THIRDARY_PIN)
-  /* Tertiary LED: independent slow breathing beacon (DFU/bootloader active).
-   * Breathes continuously — polarity-safe under both active-high and active-
-   * low LED wiring (the oscillation is visible either way; exact brightness/
-   * polarity to be confirmed on-board, see R8). */
-  cycle = millis % thirdary_cycle_length;
-  half_cycle = thirdary_cycle_length / 2;
-  if (cycle > half_cycle) {
-      cycle = thirdary_cycle_length - cycle;
+  /* 红灯：仅错误快闪（暂无错误源，常灭——写入校验失败等场景可置 LED_CYCLE_BLINK）。 */
+  {
+    uint16_t duty_cycle = 0;
+    #if LED_STATE_ON == 1
+    duty_cycle = 0xff;
+    #endif
+    led_pwm_duty_cycle(LED_THIRDARY, duty_cycle);
   }
-  duty_cycle = 0x6f * cycle / half_cycle;
-  #if LED_STATE_ON == 1
-  duty_cycle = 0xff - duty_cycle;
-  #endif
-  led_pwm_duty_cycle(LED_THIRDARY, duty_cycle);
   #endif
 }
 
@@ -437,18 +446,18 @@ void led_state(uint32_t state) {
   switch (state) {
     case STATE_USB_MOUNTED:
       new_rgb_color = 0x00ff00;
-      primary_cycle_length = 3000;
+      primary_cycle_length = 0; /* 60% 常亮：就绪，拖文件 */
       break;
 
     case STATE_BOOTLOADER_STARTED:
     case STATE_USB_UNMOUNTED:
       new_rgb_color = 0xff0000;
-      primary_cycle_length = 300;
+      primary_cycle_length = 3000; /* 3s 柔和呼吸：等待感 */
       break;
 
     case STATE_WRITING_STARTED:
       temp_color = 0xff0000;
-      primary_cycle_length = 100;
+      primary_cycle_length = LED_CYCLE_BLINK; /* 5Hz 硬快闪：在写，别拔 */
       break;
 
     case STATE_WRITING_FINISHED:
@@ -458,20 +467,12 @@ void led_state(uint32_t state) {
 
     case STATE_BLE_CONNECTED:
       new_rgb_color = 0x0000ff;
-      #ifdef LED_SECONDARY_PIN
-      secondary_cycle_length = 3000;
-      #else
-      primary_cycle_length = 3000;
-      #endif
+      primary_cycle_length = 0; /* BLE 已连待传：60% 常亮 */
       break;
 
     case STATE_BLE_DISCONNECTED:
       new_rgb_color = 0xff00ff;
-      #ifdef LED_SECONDARY_PIN
-      secondary_cycle_length = 300;
-      #else
-      primary_cycle_length = 300;
-      #endif
+      primary_cycle_length = 3000; /* BLE 未连接：3s 柔和呼吸 */
       break;
 
     default:
