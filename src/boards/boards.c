@@ -377,12 +377,6 @@ void led_pwm_duty_cycle(uint32_t led_index, uint16_t duty_cycle) {
 
 #define LED_CYCLE_BLINK 1 /* 哨兵：5Hz 硬快闪（led_tick 特判） */
 static uint32_t primary_cycle_length = 3000; /* 未收到任何状态前：3s 柔呼吸 */
-#ifdef LED_SECONDARY_PIN
-static uint32_t secondary_cycle_length;
-#endif
-#if LEDS_NUMBER > 2 && defined(LED_THIRDARY_PIN)
-static uint32_t thirdary_cycle_length = 2000; // slow independent breathing beacon
-#endif
 
 void led_tick(void) {
   uint32_t millis = _systick_count;
