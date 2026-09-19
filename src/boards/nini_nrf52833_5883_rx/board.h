@@ -37,7 +37,7 @@
 //--------------------------------------------------------------------+
 // BLE OTA 广播的设备信息（OTA 时主机看到的厂商/型号名）
 #define BLEDIS_MANUFACTURER   "NiNi_Unicorn & MINGYUE"
-#define BLEDIS_MODEL          "NiNi_Unicorn & MINGYUE smol slime 5883 receiver"
+#define BLEDIS_MODEL          "NiNi_Unicorn & MINGYUE smol slime receiver"
 
 //--------------------------------------------------------------------+
 // USB
@@ -47,7 +47,7 @@
 #define USB_DESC_CDC_ONLY_PID  0x7693   // CDC-only 模式 PID（与 UF2 模式同值，沿用兄弟板惯例）
 
 //------------- UF2（板子进 bootloader 后枚举成的 U 盘信息）-------------//
-#define UF2_PRODUCT_NAME      "NiNi_Unicorn & MINGYUE smol slime 5883 receiver"
+#define UF2_PRODUCT_NAME      "NiNi_Unicorn & MINGYUE smol slime receiver"
 #define UF2_VOLUME_LABEL      "NINISLIME"   // U 盘卷标
 #define UF2_BOARD_ID          "nRF52833-smol"
 #define UF2_INDEX_URL         "https://docs.slimevr.dev/smol-slimes/firmware/smol-flashing-firmware.html"
