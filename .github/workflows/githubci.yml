@@ -29,7 +29,7 @@ jobs:
           # Only build SlimeVR-related boards to keep CI time reasonable.
           # Matches any board directory name containing one of:
           #   slimevr, slimenrf, xiao_nrf52840, nice_nano, mochaelec_mochi, foxsnack, spiro_miro
-          BOARD_LIST=$(find . -maxdepth 1 -mindepth 1 -type d -printf '%f\n' | grep -E '(slimevr|slimenrf|xiao_nrf52840|nice_nano|mochaelec_mochi|foxsnack|spiro_miro)' || true)
+          BOARD_LIST=$(find . -maxdepth 1 -mindepth 1 -type d -printf '%f\n' | grep -E '(slimevr|slimenrf|xiao_nrf52840|nice_nano|mochaelec_mochi|foxsnack|spiro_miro|nini_nrf52833)' || true)
 
           if [ -z "$BOARD_LIST" ]; then
             MATRIX_JSON='[]'
