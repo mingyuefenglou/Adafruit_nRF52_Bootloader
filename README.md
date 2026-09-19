@@ -6,8 +6,8 @@
 
 |板|用途|
 |-|-|
-|`nini\\\_nrf52833\\\_5883`|追踪器|
-|`nini\\\_nrf52833\\\_5883\\\_rx`|接收器|
+|`nini_nrf52833_5883`|追踪器|
+|`nini_nrf52833_5883_rx`|接收器|
 
 两板均为三颗共阴 LED。
 
@@ -16,9 +16,9 @@
 GNU Make + `arm-none-eabi-gcc`（13.x），需先 `git submodule update --init`：
 
 ```bash
-make BOARD=nini\\\_nrf52833\\\_5883 all
-# 产物：\\\_build/build-<板>/ 下 3 个 hex（bare / nosd / s140\\\_7.3.0）
-# update-\\\*.uf2 需显式：make BOARD=<板> \\\_build/build-<板>/update-<板>\\\_bootloader-\\\_nosd.uf2 ...
+make BOARD=nini_nrf52833_5883 all
+# 产物：build/build-<板>/ 下 3 个 hex（bare / nosd / s140_7.3.0）
+# update-*.uf2 需显式：make BOARD=<板> _build/build-<板>/update-<板>_bootloader_nosd.uf2 ...
 ```
 
 \---
