@@ -376,6 +376,7 @@ void led_pwm_duty_cycle(uint32_t led_index, uint16_t duty_cycle) {
 }
 
 #define LED_CYCLE_BLINK 1 /* 哨兵：5Hz 硬快闪（led_tick 特判） */
+static bool secondary_blink; /* 写入 UF2 时绿灯快闪（蓝保持常亮） */
 static uint32_t primary_cycle_length = 3000; /* 未收到任何状态前：3s 柔呼吸 */
 
 void led_tick(void) {
@@ -409,11 +410,16 @@ void led_tick(void) {
   }
 
   #ifdef LED_SECONDARY_PIN
-  /* 绿灯：nini 板不参与（常灭；BLE 语义由蓝主灯承担）。保留通道写 0 防悬空占空。 */
+  /* 绿灯：默认常灭；写入 UF2 时 5Hz 快闪（蓝常亮）——"正在写入，别拔" */
   {
-    uint16_t duty_cycle = 0;
+    uint16_t duty_cycle;
+    if (secondary_blink) {
+      duty_cycle = (millis / 100) % 2 ? 0xff : 128;
+    } else {
+      duty_cycle = 0;
+    }
     #if LED_STATE_ON == 1
-    duty_cycle = 0xff;
+    duty_cycle = 0xff - duty_cycle;
     #endif
     led_pwm_duty_cycle(LED_SECONDARY, duty_cycle);
   }
@@ -451,12 +457,14 @@ void led_state(uint32_t state) {
 
     case STATE_WRITING_STARTED:
       temp_color = 0xff0000;
-      primary_cycle_length = LED_CYCLE_BLINK; /* 5Hz 硬快闪：在写，别拔 */
+      primary_cycle_length = 0; /* 蓝保持 60% 常亮（就绪感不中断） */
+      secondary_blink = true;   /* 绿 5Hz 快闪：正在写入 */
       break;
 
     case STATE_WRITING_FINISHED:
       // Empty means to unset any temp colors.
       primary_cycle_length = 3000;
+      secondary_blink = false;
       break;
 
     case STATE_BLE_CONNECTED:

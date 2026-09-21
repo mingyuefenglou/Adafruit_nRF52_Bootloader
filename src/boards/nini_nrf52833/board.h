@@ -20,8 +20,8 @@
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER       3
 #define LED_PRIMARY_PIN   _PINNUM(0, 9)  // 蓝灯（BL 状态：DFU 中快闪）——共阴高电平点亮
-#define LED_SECONDARY_PIN _PINNUM(0, 20) // 绿灯
-#define LED_THIRDARY_PIN  _PINNUM(0, 10) // 红灯（由三灯 patch 驱动为慢呼吸信标）
+#define LED_SECONDARY_PIN _PINNUM(0, 10) // 绿灯（实测订正：初版红绿引脚写反）
+#define LED_THIRDARY_PIN  _PINNUM(0, 20) // 红灯（实测订正）
 #define LED_STATE_ON      1   // 1=高电平点亮（共阴接法 / 拉电流驱动），与固件 dts 的 GPIO_ACTIVE_HIGH 一致
 
 /*------------------------------------------------------------------*/
