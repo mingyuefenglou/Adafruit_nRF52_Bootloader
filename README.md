@@ -2,6 +2,16 @@
 
 基于 [jitingcn/Adafruit\_nRF52\_Bootloader](https://github.com/jitingcn/Adafruit_nRF52_Bootloader)（master @ 37cb910，其上又源自 [adafruit/Adafruit\_nRF52\_Bootloader](https://github.com/adafruit/Adafruit_nRF52_Bootloader)）维护。
 
+## 分支说明
+
+| 分支 | 用途 |
+|---|---|
+| `main` | 稳定发布线——验证通过的版本（日常刷机用这里） |
+| `NiNi_Slime_5883` | 开发线——板级定制与功能开发在此进行，验证后合入 `main` |
+| `dev` | jitingcn 上游镜像（本仓不在此开发）——跟进上游更新、比对差异、合并上游修复 |
+
+开发流程：在 `NiNi_Slime_5883` 提交 → 上板验证 → 合入 `main` 发布。
+
 ## 本仓新增板
 
 |板|用途|
