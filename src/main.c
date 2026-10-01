@@ -193,9 +193,22 @@ int main(void) {
   // Return when DFU process is complete (or not entered at all)
   check_dfu_mode();
 
-  // Check if we must reenter the bootloader after reset, instead of 
+  // Check if we must reenter the bootloader after reset, instead of
   // launching the user application
   bool bootloader_must_be_reentered = bootloader_must_reset_to_self();
+
+#if defined(NINI_BL_RGB_STATES)
+  /* UF2 写入完成：绿灯常亮 1s 再跳 app——"完成"的明确可见反馈（灯语定型）。
+   * 中止/无效 app 不等待（直接进入后续复位逻辑）。 */
+  if (!bootloader_must_be_reentered && board_uf2_write_finished() && bootloader_app_is_valid()) {
+    uint32_t const t0 = board_millis();
+    while ((uint32_t)(board_millis() - t0) < 1000) {
+      #ifdef NRF_USBD
+      tud_task(); // 保持 USB 栈存活，避免主机端报错
+      #endif
+    }
+  }
+#endif
 
   // Reset peripherals
   board_teardown();
@@ -254,6 +267,11 @@ static void check_dfu_mode(void) {
 
   bool const reason_reset_pin = (NRF_POWER->RESETREAS & POWER_RESETREAS_RESETPIN_Msk) ? true : false;
 
+  /* 复位原因消费后立即清（W1C）：残留会让后续复位被误读。
+   * receiver app 原来从不清 RESETREAS——RESETPIN 一旦锁存，后续任何非 POR
+   * 复位都会被这里当成"复位键事件"（H2 双击魔数误触发的温床）。 */
+  NRF_POWER->RESETREAS = 0xFFFFFFFF;
+
   // start either serial, uf2 or ble
   bool dfu_start = _ota_dfu || serial_only_dfu || uf2_dfu ||
                    (((*dbl_reset_mem) == DFU_DBL_RESET_MAGIC) && reason_reset_pin);
@@ -271,7 +289,22 @@ static void check_dfu_mode(void) {
   /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
   // DFU button pressed
 #if defined(BUTTON_DFU)
-  dfu_start = dfu_start || button_pressed(BUTTON_DFU);
+  /* 按键判 DFU 只在「复位键复位」时可信：冷上电/VBUS 唤醒时引脚电平尚未稳定，
+   * receiver 的 DFU 键（P0.03）曾在每次插 USB 上电时被误读为按住——而按键
+   * 进入的 DFU 无超时，于是每次断电重启都永久卡 BL（app 侧早有同款 VBUS 守卫，
+   * 见 Receiver/app system.c；此处为 BL 侧镜像修复）。
+   * 刻意进 DFU 的手势不受影响：按住 SW0 再点一下复位（RESETPIN 置位），或双击复位。
+   * 去抖：5 次 × 2ms 全部读低才算真按住。 */
+  if (reason_reset_pin) {
+    uint8_t low_count = 0;
+    for (uint8_t i = 0; i < 5; i++) {
+      if (button_pressed(BUTTON_DFU)) {
+        low_count++;
+      }
+      NRFX_DELAY_MS(2);
+    }
+    dfu_start = dfu_start || (low_count == 5);
+  }
 #endif
 
   // DFU + FRESET are pressed --> OTA
@@ -337,8 +370,13 @@ static void check_dfu_mode(void) {
     if (APP_ASKS_FOR_SINGLE_TAP_RESET() || uf2_dfu || serial_only_dfu) {
       // If USB is not enumerated in 15s (eg. because we're running on battery), we restart into app.
       bootloader_dfu_start(_ota_dfu, 15000, true);
+    } else if (valid_app) {
+      /* 按键/双击进入的 DFU 也给 60s 兜底：若无 USB 枚举（充电器上电误触发等），
+       * 超时自动重启进 app——误触发可自愈；枚举后计时即取消，正常刷写不受影响。
+       * （无有效 app 时保持无限等待：新板首次刷机的 U 盘不会被定时踢掉。） */
+      bootloader_dfu_start(_ota_dfu, 60000, true);
     } else {
-      // No timeout if bootloader requires user action (double-reset).
+      // No valid app: wait indefinitely for a firmware image.
       bootloader_dfu_start(_ota_dfu, 0, false);
     }
 
