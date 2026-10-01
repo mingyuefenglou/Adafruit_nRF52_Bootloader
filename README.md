@@ -16,35 +16,46 @@
 
 |板|用途|
 |-|-|
-|`nini_nrf52833_5883`|追踪器|
-|`nini_nrf52833_5883_rx`|接收器|
+|`nini_nrf52833`|追踪器|
+|`nini_nrf52833_rx`|接收器|
 
-两板均为三颗共阴 LED。
+两板均为三颗共阴 LED（GPIO 经 1kΩ 限流；红/绿/蓝引脚映射见各板 `board.h`）。
 
-## LED 状态指示（定型）
+## LED 状态指示（本轮重做）
 
-蓝=主状态灯三态；红/绿不参与（错误场景红快闪）。
+三灯分工：**红**=无通讯、**绿**=有通讯、**蓝**=写入中（语义统一，一眼可辨）。
 
-| BL 状态 | 蓝灯表现 |
+| BL 状态 | 灯表现 |
 |---|---|
-| 进 DFU、U 盘未挂载 | 柔和呼吸 3s 周期（等待感） |
-| U 盘挂载成功 | 60% 常亮（就绪，拖文件） |
-| 写入 UF2 中 | 5Hz 硬快闪（在写，别拔） |
-| 写入完成 | 渐灭 → 重启 |
-| 错误（CRC 失败等） | 蓝灭，红快闪 |
-| BLE OTA（未连/已连/传输） | 同 DFU 三态对应 |
+| 上电未与电脑通讯（充电器/纯供电/枚举前） | **红常亮** ~50% |
+| 与电脑建立通讯（OS 认卷/读写活动） | **绿常亮** 60% |
+| 写入 UF2 中 | **蓝快闪** 2.5Hz（200/200ms，清晰可辨，别拔） |
+| 写入完成 | **绿常亮 1s** → 自动进 APP（APP 无效则回红等待） |
+| BLE OTA | 广播中=红、已连接=绿（绿=有通讯，与 UF2 一致） |
+
+## 本仓加固（Receiver 断电必进 BL 修复）
+
+修复「接收器断电后每次上电都进 BL 而非 APP、须重刷 UF2」的问题，四重防护：
+
+1. **早清 RESETREAS**：启动早期快照并清除复位原因寄存器（W1C），杜绝残留 RESETPIN 位被后续误判。
+2. **按键去抖 + 仅信引脚复位**：DFU 按键（P0.03）只在「本次为引脚复位」时经多次采样去抖后才采信——USB 插入的上电毛刺不再被当成「按住进 DFU」。
+3. **兜底超时**：存在有效 APP 时，按键/双击进入的 DFU 也有 60s 无 USB 枚举则自动跳 APP 的超时，误触发可自愈（全新无 APP 的板仍无限等待刷机）。
+4. **写完绿灯 1s**：UF2 写完且 APP 有效时，绿灯常亮 1s 再进 APP（可见的「刷好了」反馈）。
+
+> 改动后 deliberate 进 DFU 的手势仍可用：按住按键再点按复位、或双击复位。
 
 ## 编译
 
 GNU Make + `arm-none-eabi-gcc`（13.x），需先 `git submodule update --init`：
 
 ```bash
-make BOARD=nini_nrf52833_5883 all
-# 产物：build/build-<板>/ 下 3 个 hex（bare / nosd / s140_7.3.0）
-# update-*.uf2 需显式：make BOARD=<板> _build/build-<板>/update-<板>_bootloader_nosd.uf2 ...
+rm -rf _build/build-*                            # BL 改动后须干净重编
+make BOARD=nini_nrf52833 all -j$(nproc) -k       # 追踪器；接收器用 nini_nrf52833_rx
+# 产物：_build/build-<板>/ 下 3 个 hex（bare / nosd / s140_7.3.0）与对应 update-*.uf2
+# 注：nrfutil zip 报 Error 127 为已知无害（BLE 升级包恒缺），加 -k 让 UF2 目标照常生成
 ```
 
-\---
+---
 
 本仓基于 [jitingcn/Adafruit\_nRF52\_Bootloader](https://github.com/jitingcn/Adafruit_nRF52_Bootloader)（其上源自 [adafruit/Adafruit\_nRF52\_Bootloader](https://github.com/adafruit/Adafruit_nRF52_Bootloader)）维护。
 Adafruit 原版文档（官方板卡清单、nrfutil DFU 说明等）与本项目无关，完整内容请见上游仓库；许可沿袭上游（见仓库 `LICENSE`）。
