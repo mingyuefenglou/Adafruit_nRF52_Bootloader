@@ -1,6 +1,22 @@
 # Adafruit nRF52 Bootloader
 
+> NiNi SlimeVR 追踪器/接收器的 UF2 + BLE OTA 引导加载器 —— 基于 jitingcn 分支维护，新增 nRF52833 两板与三灯状态指示。
+
+[![build](https://github.com/mingyuefenglou/Adafruit_nRF52_Bootloader/actions/workflows/githubci.yml/badge.svg?branch=NiNi_Slime_5883)](https://github.com/mingyuefenglou/Adafruit_nRF52_Bootloader/actions/workflows/githubci.yml)
+![MCU](https://img.shields.io/badge/MCU-nRF52833-333333)
+![toolchain](https://img.shields.io/badge/toolchain-arm--none--eabi--gcc-blue)
+![license](https://img.shields.io/badge/license-upstream-lightgrey)
+
 基于 [jitingcn/Adafruit\_nRF52\_Bootloader](https://github.com/jitingcn/Adafruit_nRF52_Bootloader)（master @ 37cb910，其上又源自 [adafruit/Adafruit\_nRF52\_Bootloader](https://github.com/adafruit/Adafruit_nRF52_Bootloader)）维护。
+
+## 特性
+
+| 模块 | 说明 |
+|---|---|
+| **引导** | UF2（USB MSC 拖放刷机）+ BLE OTA（S140 SoftDevice）双 DFU 通道 |
+| **新增板** | `nini_nrf52833`（追踪器）· `nini_nrf52833_rx`（接收器），三共阴 LED（GPIO 经 1kΩ 限流） |
+| **灯语** | 🔴 无通讯 / 🟢 有通讯 / 🔵 写入中 / 写完绿 1s 进 APP——状态一眼可辨 |
+| **加固** | Receiver 断电必进 BL 修复：RESETREAS 早清 · 按键仅信引脚复位+去抖 · 60s 兜底超时 · 写完绿灯反馈 |
 
 ## 分支说明
 
@@ -14,10 +30,10 @@
 
 ## 本仓新增板
 
-|板|用途|
-|-|-|
-|`nini_nrf52833`|追踪器|
-|`nini_nrf52833_rx`|接收器|
+| 板 | 用途 |
+|---|---|
+| `nini_nrf52833` | 追踪器 |
+| `nini_nrf52833_rx` | 接收器 |
 
 两板均为三颗共阴 LED（GPIO 经 1kΩ 限流；红/绿/蓝引脚映射见各板 `board.h`）。
 
@@ -27,11 +43,11 @@
 
 | BL 状态 | 灯表现 |
 |---|---|
-| 上电未与电脑通讯（充电器/纯供电/枚举前） | **红常亮** ~50% |
-| 与电脑建立通讯（OS 认卷/读写活动） | **绿常亮** 60% |
-| 写入 UF2 中 | **蓝快闪** 2.5Hz（200/200ms，清晰可辨，别拔） |
-| 写入完成 | **绿常亮 1s** → 自动进 APP（APP 无效则回红等待） |
-| BLE OTA | 广播中=红、已连接=绿（绿=有通讯，与 UF2 一致） |
+| 上电未与电脑通讯（充电器/纯供电/枚举前） | 🔴 **红常亮** ~50% |
+| 与电脑建立通讯（OS 认卷/读写活动） | 🟢 **绿常亮** 60% |
+| 写入 UF2 中 | 🔵 **蓝快闪** 2.5Hz（200/200ms，清晰可辨，别拔） |
+| 写入完成 | 🟢 **绿常亮 1s** → 自动进 APP（APP 无效则回红等待） |
+| BLE OTA | 广播中=🔴 红、已连接=🟢 绿（绿=有通讯，与 UF2 一致） |
 
 ## 本仓加固（Receiver 断电必进 BL 修复）
 
@@ -59,4 +75,3 @@ make BOARD=nini_nrf52833 all -j$(nproc) -k       # 追踪器；接收器用 nini
 
 本仓基于 [jitingcn/Adafruit\_nRF52\_Bootloader](https://github.com/jitingcn/Adafruit_nRF52_Bootloader)（其上源自 [adafruit/Adafruit\_nRF52\_Bootloader](https://github.com/adafruit/Adafruit_nRF52_Bootloader)）维护。
 Adafruit 原版文档（官方板卡清单、nrfutil DFU 说明等）与本项目无关，完整内容请见上游仓库；许可沿袭上游（见仓库 `LICENSE`）。
-
