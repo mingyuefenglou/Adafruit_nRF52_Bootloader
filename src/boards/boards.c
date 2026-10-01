@@ -375,6 +375,76 @@ void led_pwm_duty_cycle(uint32_t led_index, uint16_t duty_cycle) {
   nrf_pwm_task_trigger(NRF_PWM0, NRF_PWM_TASK_SEQSTART0);
 }
 
+uint32_t board_millis(void) { return _systick_count; }
+
+#if defined(NINI_BL_RGB_STATES)
+/* BL 灯语定型（nini 三色共阴板，tracker/receiver 两板共用；语义统一：绿=有通讯，红=无通讯）：
+ *   红常亮 50%   = 无通讯：充电器/纯供电/枚举前/拔线后——"插着但没人说话"
+ *   绿常亮 60%   = 通讯建立：主机对 UF2 卷有过数据读写（或 BLE 已连接）
+ *   蓝 2.5Hz 快闪 = 正在写入 UF2——频率刻意放缓，肉眼清楚可辨"在写，别拔"
+ *   绿常亮 1s    = 写入完成，随后跳 app（main.c 据 uf2_write_finished 等满 1s） */
+#define BL_LED_RED_IDLE     0
+#define BL_LED_GREEN_COMMS  1
+#define BL_LED_BLUE_WRITING 2
+#define BL_LED_GREEN_DONE   3
+
+static uint8_t  bl_led_mode = BL_LED_RED_IDLE;
+static bool     usb_comms_seen;      /* MSC 读/写活动 latch：见过一次数据即算"通讯建立"，拔线清零 */
+static bool     uf2_write_finished;  /* 写完标志：main 据此做"绿 1s 再跳 app" */
+static uint32_t writing_finished_at; /* 写完时刻（systick ms），备用 */
+
+bool board_uf2_write_finished(void) { return uf2_write_finished; }
+uint32_t board_uf2_write_finished_at(void) { return writing_finished_at; }
+
+/* MSC read10/write10 回调里调用：任何对 UF2 卷的数据活动都视为"与电脑通讯"。 */
+void led_usb_comms_activity(void) {
+  if (!usb_comms_seen) {
+    usb_comms_seen = true;
+    if (bl_led_mode == BL_LED_RED_IDLE) {
+      bl_led_mode = BL_LED_GREEN_COMMS; /* 写入中/完成态不被覆盖 */
+    }
+  }
+}
+
+void led_tick(void) {
+  uint32_t millis = _systick_count;
+  uint16_t duty_r = 0, duty_g = 0, duty_b = 0;
+
+  switch (bl_led_mode) {
+    case BL_LED_GREEN_COMMS:
+    case BL_LED_GREEN_DONE:
+      duty_g = 153; /* 60% 常亮 */
+      break;
+    case BL_LED_BLUE_WRITING:
+      duty_b = (millis / 200) % 2 ? 0xff : 0; /* 2.5Hz 方波硬闪：看得清"在写" */
+      break;
+    case BL_LED_RED_IDLE:
+    default:
+      duty_r = 128; /* 50%：红色光效最高，压半 */
+      break;
+  }
+
+  #if LED_STATE_ON == 1 /* 共阴高电平点亮：PWM 值为低电平时长，逐通道取反 */
+  duty_r = 0xff - duty_r;
+  duty_g = 0xff - duty_g;
+  duty_b = 0xff - duty_b;
+  #endif
+
+  led_pwm_duty_cycle(LED_PRIMARY, duty_b); /* 蓝 */
+  #ifdef LED_SECONDARY_PIN
+  led_pwm_duty_cycle(LED_SECONDARY, duty_g); /* 绿 */
+  #endif
+  #if LEDS_NUMBER > 2 && defined(LED_THIRDARY_PIN)
+  led_pwm_duty_cycle(LED_THIRDARY, duty_r); /* 红 */
+  #endif
+}
+
+#else /* 非 nini 板：沿用原蓝灯状态机，行为不变 */
+
+bool board_uf2_write_finished(void) { return false; }
+uint32_t board_uf2_write_finished_at(void) { return 0; }
+void led_usb_comms_activity(void) {}
+
 #define LED_CYCLE_BLINK 1 /* 哨兵：5Hz 硬快闪（led_tick 特判） */
 static bool secondary_blink; /* 写入 UF2 时绿灯快闪（蓝保持常亮） */
 static uint32_t primary_cycle_length = 3000; /* 未收到任何状态前：3s 柔呼吸 */
@@ -437,10 +507,54 @@ void led_tick(void) {
   #endif
 }
 
+#endif /* NINI_BL_RGB_STATES */
+
+#if !defined(NINI_BL_RGB_STATES)
 static uint32_t rgb_color;
 static bool temp_color_active = false;
+#endif
 
 void led_state(uint32_t state) {
+#if defined(NINI_BL_RGB_STATES)
+  /* nini 灯语：状态 → 三灯模式（渲染在 led_tick） */
+  switch (state) {
+    case STATE_USB_MOUNTED:
+      /* 枚举完成 ≠ 通讯建立；首个 MSC 数据（read10/write10）才转绿。
+       * 若活动先到（极少见），此处补齐。 */
+      if (usb_comms_seen && bl_led_mode == BL_LED_RED_IDLE) {
+        bl_led_mode = BL_LED_GREEN_COMMS;
+      }
+      break;
+
+    case STATE_BOOTLOADER_STARTED:
+    case STATE_USB_UNMOUNTED:
+      bl_led_mode = BL_LED_RED_IDLE;
+      usb_comms_seen = false; /* 拔线/重来：通讯 latch 清零，下次插入从红开始 */
+      break;
+
+    case STATE_WRITING_STARTED:
+      bl_led_mode = BL_LED_BLUE_WRITING;
+      break;
+
+    case STATE_WRITING_FINISHED:
+      bl_led_mode = BL_LED_GREEN_DONE;
+      uf2_write_finished = true;
+      writing_finished_at = _systick_count;
+      break;
+
+    case STATE_BLE_CONNECTED:
+      bl_led_mode = BL_LED_GREEN_COMMS;
+      break;
+
+    case STATE_BLE_DISCONNECTED:
+      bl_led_mode = BL_LED_RED_IDLE; /* BLE 广播中=尚未通讯 */
+      break;
+
+    default:
+      break;
+  }
+  return;
+#else
   uint32_t new_rgb_color = rgb_color;
   uint32_t temp_color = 0;
   switch (state) {
@@ -500,6 +614,7 @@ void led_state(uint32_t state) {
 #else
   (void) final_color;
 #endif
+#endif /* NINI_BL_RGB_STATES */
 }
 
 #ifdef LED_NEOPIXEL

@@ -143,6 +143,9 @@ int32_t tud_msc_read10_cb (uint8_t lun, uint32_t lba, uint32_t offset, void* buf
   (void) lun;
   memset(buffer, 0, bufsize);
 
+  // 主机读卷（枚举后 OS 自动读 FAT/INFO_UF2.TXT）= 与电脑通讯建立 → 转绿
+  led_usb_comms_activity();
+
   // since we return block size each, offset should always be zero
   TU_ASSERT(offset == 0, -1);
 
@@ -177,6 +180,7 @@ int32_t tud_msc_write10_cb (uint8_t lun, uint32_t lba, uint32_t offset, uint8_t*
     if ( written > 0 )
     {
       bootloader_dfu_activity_mark();
+      led_usb_comms_activity(); // 写卷同样是通讯活动 → 转绿（写入态由状态机覆盖为蓝闪）
     }
     else if ( written == 0 )
     {

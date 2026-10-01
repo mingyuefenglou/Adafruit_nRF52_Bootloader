@@ -99,6 +99,12 @@ void led_pwm_enable(uint32_t led_index);
 void led_state(uint32_t state);
 void led_tick(void);
 
+// nini 三灯 BL 灯语辅助（非 nini 板为恒假/空实现，见 boards.c）
+uint32_t board_millis(void);                 // systick 毫秒
+bool board_uf2_write_finished(void);         // UF2 写入已完成（main 据此绿 1s 再跳 app）
+uint32_t board_uf2_write_finished_at(void);  // 完成时刻（ms）
+void led_usb_comms_activity(void);           // MSC 读/写活动 → "通讯建立"（转绿）
+
 //--------------------------------------------------------------------+
 // BUTTONS
 //--------------------------------------------------------------------+
