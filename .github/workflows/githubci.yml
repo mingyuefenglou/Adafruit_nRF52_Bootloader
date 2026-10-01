@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   pull_request:
   push:
-    branches: [ master, main ]
+    branches: [ master, main, NiNi_Slime_5883 ]
   release:
     types:
       - created
