@@ -379,10 +379,12 @@ uint32_t board_millis(void) { return _systick_count; }
 
 #if defined(NINI_BL_RGB_STATES)
 /* BL 灯语定型（nini 三色共阴板，tracker/receiver 两板共用；语义统一：绿=有通讯，红=无通讯）：
- *   红常亮 50%   = 无通讯：充电器/纯供电/枚举前/拔线后——"插着但没人说话"
- *   绿常亮 60%   = 通讯建立：主机对 UF2 卷有过数据读写（或 BLE 已连接）
- *   蓝 2.5Hz 快闪 = 正在写入 UF2——频率刻意放缓，肉眼清楚可辨"在写，别拔"
- *   绿常亮 1s    = 写入完成，随后跳 app（main.c 据 uf2_write_finished 等满 1s） */
+ *   红呼吸 3s 峰25% = 无通讯：充电器/纯供电/枚举前/拔线后——"插着但没人说话"（呼吸+降亮，暗光不刺眼）
+ *   绿呼吸 3s 峰50% = 通讯建立：主机对 UF2 卷有过数据读写（或 BLE 已连接）（绿电气弱 ~0.2mA，峰须高于红）
+ *   蓝 5Hz 快闪     = 正在写入 UF2——高频快闪，肉眼清楚可辨"在写，别拔"
+ *   绿呼吸 1s       = 写入完成，随后跳 app（main.c 据 uf2_write_finished 等满 1s）
+ * 亮度依据：REGOUT0=3.3V、限流 1kΩ → 红峰值 ~1.1mA、绿/蓝 ~0.2mA（红电气 4-5 倍），
+ * 故红峰压到 25%（~0.28mA）、绿峰给到 50%（~0.1mA）观感才平衡。 */
 #define BL_LED_RED_IDLE     0
 #define BL_LED_GREEN_COMMS  1
 #define BL_LED_BLUE_WRITING 2
@@ -406,6 +408,14 @@ void led_usb_comms_activity(void) {
   }
 }
 
+/* 3s 三角呼吸：0→peak→0（数学移植自下方非 nini 分支的柔呼吸斜坡）。 */
+static uint8_t bl_breath(uint32_t period_ms, uint8_t peak) {
+  uint32_t cycle = _systick_count % period_ms;
+  uint32_t half = period_ms / 2;
+  uint32_t v = (cycle < half) ? cycle : (period_ms - cycle);
+  return (uint8_t)((uint32_t)peak * v / half);
+}
+
 void led_tick(void) {
   uint32_t millis = _systick_count;
   uint16_t duty_r = 0, duty_g = 0, duty_b = 0;
@@ -413,14 +423,14 @@ void led_tick(void) {
   switch (bl_led_mode) {
     case BL_LED_GREEN_COMMS:
     case BL_LED_GREEN_DONE:
-      duty_g = 153; /* 60% 常亮 */
+      duty_g = bl_breath(3000, 128); /* 3s 呼吸，峰 50%（绿 ~0.2mA 峰值） */
       break;
     case BL_LED_BLUE_WRITING:
-      duty_b = (millis / 200) % 2 ? 0xff : 0; /* 2.5Hz 方波硬闪：看得清"在写" */
+      duty_b = (millis / 100) % 2 ? 0xff : 0; /* 5Hz 方波硬闪（原 2.5Hz 加快一倍） */
       break;
     case BL_LED_RED_IDLE:
     default:
-      duty_r = 128; /* 50%：红色光效最高，压半 */
+      duty_r = bl_breath(3000, 64); /* 3s 呼吸，峰 25%（红 ~1.1mA 峰值，压亮） */
       break;
   }
 

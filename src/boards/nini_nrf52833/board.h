@@ -2,7 +2,7 @@
  * 板级配置：nini_nrf52833 ——【追踪器 tracker】的 Adafruit UF2 bootloader
  * 芯片 nRF52833（512KB flash / 128KB RAM），SoftDevice s140 7.3.0。
  * 引脚速览（与固件 dts 一致，三颗 LED【共阴】接法，高电平点亮）：
- *   蓝 P0.20（LED_PRIMARY，BL 状态灯）/ 绿 P0.10 / 红 P0.09；
+ *   蓝 P0.20（LED_PRIMARY，BL 状态灯）/ 绿 P0.09 / 红 P0.10；
  *   DFU 按键 = SW0 P0.04（P0.18 已用作 nRESET，不可作按键）。
  * USB：VID 0x1209 / PID 0x7693（pid.codes 已为 SlimeVR 注册）。
  * 说明：本板文件由我们注入，上游 Adafruit/jitingcn 仓库不含。
@@ -20,8 +20,8 @@
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER       3
 #define LED_PRIMARY_PIN   _PINNUM(0, 20) // 蓝灯（BL 状态灯：刷写快闪）——共阴高电平点亮（实测订正：换 LED 后红蓝对调）
-#define LED_SECONDARY_PIN _PINNUM(0, 10) // 绿灯（通讯建立常亮）
-#define LED_THIRDARY_PIN  _PINNUM(0, 9)  // 红灯（无通讯/纯供电常亮；实测订正）
+#define LED_SECONDARY_PIN _PINNUM(0, 9)  // 绿灯（通讯建立呼吸）——实测订正：换 LED 后红绿对调
+#define LED_THIRDARY_PIN  _PINNUM(0, 10) // 红灯（无通讯/纯供电呼吸；实测订正：换 LED 后红绿对调）
 #define LED_STATE_ON      1   // 1=高电平点亮（共阴接法 / 拉电流驱动），与固件 dts 的 GPIO_ACTIVE_HIGH 一致
 #define NINI_BL_RGB_STATES 1  // 启用 nini 三灯 BL 灯语（红=无通讯/绿=通讯/蓝闪=写入/绿1s=完成）
 
