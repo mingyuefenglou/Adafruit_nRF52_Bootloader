@@ -23,7 +23,7 @@
 #define LED_SECONDARY_PIN _PINNUM(0, 9)  // 绿灯（通讯建立呼吸）——实测订正：换 LED 后红绿对调
 #define LED_THIRDARY_PIN  _PINNUM(0, 10) // 红灯（无通讯/纯供电呼吸；实测订正：换 LED 后红绿对调）
 #define LED_STATE_ON      1   // 1=高电平点亮（共阴接法 / 拉电流驱动），与固件 dts 的 GPIO_ACTIVE_HIGH 一致
-#define NINI_BL_RGB_STATES 1  // 启用 nini 三灯 BL 灯语（红=无通讯/绿=通讯/蓝闪=写入/绿1s=完成）
+#define NINI_BL_RGB_STATES 1  // 启用 nini 三灯 BL 灯语（红=无通讯/绿=通讯/蓝闪=写入/全彩闪1.2s=完成）
 
 /*------------------------------------------------------------------*/
 /* BUTTON

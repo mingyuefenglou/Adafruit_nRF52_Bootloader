@@ -198,7 +198,7 @@ int main(void) {
   bool bootloader_must_be_reentered = bootloader_must_reset_to_self();
 
 #if defined(NINI_BL_RGB_STATES)
-  /* UF2 写入完成：绿灯呼吸 1.2s 再跳 app——"完成"的明确可见反馈（灯语定型）。
+  /* UF2 写入完成：全彩闪烁 1.2s 再跳 app——"完成"的明确可见反馈（灯语定型）。
    * 中止/无效 app 不等待（直接进入后续复位逻辑）。 */
   if (!bootloader_must_be_reentered && board_uf2_write_finished() && bootloader_app_is_valid()) {
     uint32_t const t0 = board_millis();
