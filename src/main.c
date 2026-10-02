@@ -198,11 +198,11 @@ int main(void) {
   bool bootloader_must_be_reentered = bootloader_must_reset_to_self();
 
 #if defined(NINI_BL_RGB_STATES)
-  /* UF2 写入完成：绿灯常亮 1s 再跳 app——"完成"的明确可见反馈（灯语定型）。
+  /* UF2 写入完成：绿灯呼吸 1.2s 再跳 app——"完成"的明确可见反馈（灯语定型）。
    * 中止/无效 app 不等待（直接进入后续复位逻辑）。 */
   if (!bootloader_must_be_reentered && board_uf2_write_finished() && bootloader_app_is_valid()) {
     uint32_t const t0 = board_millis();
-    while ((uint32_t)(board_millis() - t0) < 1000) {
+    while ((uint32_t)(board_millis() - t0) < 1200) {
       #ifdef NRF_USBD
       tud_task(); // 保持 USB 栈存活，避免主机端报错
       #endif

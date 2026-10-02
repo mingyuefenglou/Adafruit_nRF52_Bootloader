@@ -381,8 +381,8 @@ uint32_t board_millis(void) { return _systick_count; }
 /* BL 灯语定型（nini 三色共阴板，tracker/receiver 两板共用；语义统一：绿=有通讯，红=无通讯）：
  *   红呼吸 3s 峰25% = 无通讯：充电器/纯供电/枚举前/拔线后——"插着但没人说话"（呼吸+降亮，暗光不刺眼）
  *   绿呼吸 3s 峰50% = 通讯建立：主机对 UF2 卷有过数据读写（或 BLE 已连接）（绿电气弱 ~0.2mA，峰须高于红）
- *   蓝 5Hz 快闪     = 正在写入 UF2——高频快闪，肉眼清楚可辨"在写，别拔"
- *   绿呼吸 1s       = 写入完成，随后跳 app（main.c 据 uf2_write_finished 等满 1s）
+ *   蓝 10Hz 快闪    = 正在写入 UF2——高频快闪，肉眼清楚可辨"在写，别拔"
+ *   绿 1.2s 呼吸    = 写入完成（完整一次 0→峰→0），随后跳 app（main.c 等满 1.2s）
  * 亮度依据：REGOUT0=3.3V、限流 1kΩ → 红峰值 ~1.1mA、绿/蓝 ~0.2mA（红电气 4-5 倍），
  * 故红峰压到 25%（~0.28mA）、绿峰给到 50%（~0.1mA）观感才平衡。 */
 #define BL_LED_RED_IDLE     0
@@ -392,7 +392,7 @@ uint32_t board_millis(void) { return _systick_count; }
 
 static uint8_t  bl_led_mode = BL_LED_RED_IDLE;
 static bool     usb_comms_seen;      /* MSC 读/写活动 latch：见过一次数据即算"通讯建立"，拔线清零 */
-static bool     uf2_write_finished;  /* 写完标志：main 据此做"绿 1s 再跳 app" */
+static bool     uf2_write_finished;  /* 写完标志：main 据此做"绿 1.2s 呼吸再跳 app" */
 static uint32_t writing_finished_at; /* 写完时刻（systick ms），备用 */
 
 bool board_uf2_write_finished(void) { return uf2_write_finished; }
@@ -422,11 +422,20 @@ void led_tick(void) {
 
   switch (bl_led_mode) {
     case BL_LED_GREEN_COMMS:
-    case BL_LED_GREEN_DONE:
       duty_g = bl_breath(3000, 128); /* 3s 呼吸，峰 50%（绿 ~0.2mA 峰值） */
       break;
+    case BL_LED_GREEN_DONE: {
+      /* 写完确认：以完成时刻为起点的一次完整 1.2s 呼吸（0→峰→0），
+       * 与 main.c 等待时长一致——见到的即跳 app 前完整呼吸一次 */
+      uint32_t done_elapsed = millis - writing_finished_at;
+      if (done_elapsed < 1200) {
+        uint32_t v = (done_elapsed < 600) ? done_elapsed : (1200 - done_elapsed);
+        duty_g = (uint16_t)(128u * v / 600);
+      }
+      break;
+    }
     case BL_LED_BLUE_WRITING:
-      duty_b = (millis / 100) % 2 ? 0xff : 0; /* 5Hz 方波硬闪（原 2.5Hz 加快一倍） */
+      duty_b = (millis / 50) % 2 ? 0xff : 0; /* 10Hz 方波硬闪（原 5Hz 再加倍，写入态更醒目） */
       break;
     case BL_LED_RED_IDLE:
     default:
